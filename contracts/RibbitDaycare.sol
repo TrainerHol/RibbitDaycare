@@ -51,6 +51,10 @@ contract RibbitDaycare {
     function daycareWrap(uint256[] memory _ribbitIds, uint256[] memory _days)
         public
     {
+        require(
+            wrbtAvailable() >= _ribbitIds.length,
+            "Insufficient wRBT staked in contract"
+        );
         require(_ribbitIds.length == _days.length, "Incomplete day data");
         uint256 dayCount;
         for (uint256 index = 0; index < _days.length; index++) {
@@ -71,5 +75,23 @@ contract RibbitDaycare {
             );
         }
         surf.transferFrom(msg.sender, address(this), dayCount * daycareFee);
+    }
+
+    /// @dev Adds day credits to the ribbit specified
+    function addDays(uint256 _ribbitId, uint256 amount) public {
+        require(
+            ribbits.ownerOf(_ribbitId) == address(this),
+            "Ribbit not in daycare"
+        );
+        require(
+            amount <= surf.allowance(msg.sender, address(this)),
+            "Not enough SURF allowance"
+        );
+        ribbitDays[_ribbitId] += amount * 1 days;
+        surf.transferFrom(msg.sender, address(this), amount);
+    }
+
+    function wrbtAvailable() public view returns (uint256) {
+        return wrbt.balanceOf(address(this));
     }
 }
