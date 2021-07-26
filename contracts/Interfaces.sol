@@ -31,6 +31,8 @@ interface Ribbits {
     ) external;
 
     function ownerOf(uint256 _tokenId) external view returns (address);
+
+    function setApprovalForAll(address _operator, bool _approved) external;
 }
 
 interface wRBT {

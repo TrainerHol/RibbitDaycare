@@ -8,12 +8,13 @@ contract RibbitDaycare {
     Ribbits ribbits;
     wRBT wrbt;
     uint256 public ribbitCount;
+    uint256 public wRBTCount;
     // Price in SURF per day
     uint256 public daycareFee;
 
     // Index => RibbitID
     mapping(uint256 => uint256) public ribbitIndex;
-    // RibbitID => Owners
+    // RibbitID => Owner
     mapping(uint256 => address) public ribbitOwners;
     // wRBT Staker => Amount
     mapping(address => uint256) public stakerBalances;
@@ -30,6 +31,7 @@ contract RibbitDaycare {
         ribbits = Ribbits(_ribbits);
         wrbt = wRBT(_wrbt);
         daycareFee = _daycareFee;
+        ribbits.setApprovalForAll(_wrbt, true);
     }
 
     /// @dev Gets the ID's of ribbits currently deposited by someone
@@ -48,36 +50,61 @@ contract RibbitDaycare {
         return ribbitList;
     }
 
-    function daycareWrap(uint256[] memory _ribbitIds, uint256[] memory _days)
-        public
-    {
+    /// @dev Stakes wRBT's in the contract.
+    /// @param amount The amount of wRBT staked, whole number.
+    /// Sticking to whole numbers for simplicity, as staking 0.5 wRBT
+    /// that is currently not in contract is impossible to withdraw
+    /// for 0.5 Ribbits!
+    function stakewRBT(uint256 amount) public {
+        require(amount % (1 * 10**18) == 0, "Must be whole wRBT");
         require(
-            wrbtAvailable() >= _ribbitIds.length,
+            amount <= wrbt.allowance(msg.sender, address(this)),
+            "No allowance"
+        );
+        stakerBalances[msg.sender] += amount;
+        wrbt.transferFrom(msg.sender, address(this), amount);
+    }
+
+    /// @dev Unstakes wRBT's in the contract if there is supply held.
+    function unstakewRBT(uint256 amount) public {
+        //TODO: Unstake wRBT only if the contract holds abandonded ribbits (and wrap them) or wRBT
+    }
+
+    /// @dev Deposits a ribbit in exchange of a wRBT that is currently staked.
+    /// @param _ribbitIds Array with the id's of the ribbits.
+    /// @param _days Amount of days to deposit for, paid in SURF with bulk discount.
+    function daycareDeposit(uint256[] memory _ribbitIds, uint256 _days) public {
+        uint256 ribbitNumber = _ribbitIds.length;
+        require(
+            wrbtAvailable() >= ribbitNumber,
             "Insufficient wRBT staked in contract"
         );
-        require(_ribbitIds.length == _days.length, "Incomplete day data");
-        uint256 dayCount;
-        for (uint256 index = 0; index < _days.length; index++) {
-            dayCount += _days[index];
-        }
         require(
-            dayCount <= surf.allowance(msg.sender, address(this)),
+            _days <= surf.allowance(msg.sender, address(this)),
             "Not enough SURF allowance"
         );
-        for (uint256 index = 0; index < _ribbitIds.length; index++) {
-            ribbitDays[_ribbitIds[index]] = _days[index] * 1 days;
+        // Add time to each ribbit
+        for (uint256 index = 0; index < ribbitNumber; index++) {
+            ribbitDays[_ribbitIds[index]] = _days * 1 days;
         }
-        for (uint256 index = 0; index < _ribbitIds.length; index++) {
+        // Transfer each ribbit
+        for (uint256 index = 0; index < ribbitNumber; index++) {
             ribbits.safeTransferFrom(
                 msg.sender,
                 address(this),
                 _ribbitIds[index]
             );
         }
-        surf.transferFrom(msg.sender, address(this), dayCount * daycareFee);
+        surf.transferFrom(msg.sender, address(this), _days * daycareFee);
+        wrbt.transfer(msg.sender, ribbitNumber);
     }
 
-    /// @dev Adds day credits to the ribbit specified
+    /// @dev Wraps all ribbits owned by the contract that have no time left.
+    function wrapAbandonedRibbits() public {
+        //TODO: Bulk wrap all the ribbits with no time left, remove from lists, etc.
+    }
+
+    /// @dev Adds day credits to the ribbit specified, must be already deposited
     function addDays(uint256 _ribbitId, uint256 amount) public {
         require(
             ribbits.ownerOf(_ribbitId) == address(this),
@@ -91,7 +118,8 @@ contract RibbitDaycare {
         surf.transferFrom(msg.sender, address(this), amount);
     }
 
-    function wrbtAvailable() public view returns (uint256) {
-        return wrbt.balanceOf(address(this));
+    /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number
+    function wrbtAvailable() public view returns (uint256 wrbtBalances) {
+        return wrbt.balanceOf(address(this)) / (1 * 10**18);
     }
 }
