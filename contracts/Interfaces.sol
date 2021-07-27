@@ -1,4 +1,12 @@
 //SPDX-License-Identifier: MIT
+//  ___   ___      ______       __
+// /__/\ /__/\    /_____/\     /_/\
+// \::\ \\  \ \   \:::_ \ \    \:\ \
+//  \::\/_\ .\ \   \:\ \ \ \    \:\ \
+//   \:: ___::\ \   \:\ \ \ \    \:\ \____
+//    \: \ \\::\ \   \:\_\ \ \    \:\/___/\
+//     \__\/ \::\/    \_____\/     \_____\/
+
 pragma solidity ^0.8.4;
 
 interface SURF {
@@ -52,4 +60,6 @@ interface wRBT {
         external
         view
         returns (uint256);
+
+    function wrap(uint256[] calldata _tokenIds) external;
 }

@@ -1,4 +1,11 @@
 //SPDX-License-Identifier: MIT
+//  ___   ___      ______       __
+// /__/\ /__/\    /_____/\     /_/\
+// \::\ \\  \ \   \:::_ \ \    \:\ \
+//  \::\/_\ .\ \   \:\ \ \ \    \:\ \
+//   \:: ___::\ \   \:\ \ \ \    \:\ \____
+//    \: \ \\::\ \   \:\_\ \ \    \:\/___/\
+//     \__\/ \::\/    \_____\/     \_____\/
 pragma solidity ^0.8.4;
 
 import "./Interfaces.sol";
@@ -20,6 +27,8 @@ contract RibbitDaycare {
     mapping(address => uint256) public stakerBalances;
     // RibbitID => Number of Days
     mapping(uint256 => uint256) public ribbitDays;
+    // RibbitID => Depositted Timestamp
+    mapping(uint256 => uint256) public depositDates;
 
     constructor(
         address _surf,
@@ -83,9 +92,10 @@ contract RibbitDaycare {
             _days <= surf.allowance(msg.sender, address(this)),
             "Not enough SURF allowance"
         );
-        // Add time to each ribbit
+        // Add time and deposit date to each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
             ribbitDays[_ribbitIds[index]] = _days * 1 days;
+            depositDates[_ribbitIds[index]] = block.timestamp;
         }
         // Transfer each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
@@ -102,6 +112,56 @@ contract RibbitDaycare {
     /// @dev Wraps all ribbits owned by the contract that have no time left.
     function wrapAbandonedRibbits() public {
         //TODO: Bulk wrap all the ribbits with no time left, remove from lists, etc.
+        uint256[] memory abandonedRibbits = getAbandonedRibbits();
+        require(abandonedRibbits.length > 0, "No abandonded ribbits");
+        for (uint256 index = 0; index < abandonedRibbits.length; index++) {
+            delete ribbitOwners[abandonedRibbits[index]];
+            delete depositDates[abandonedRibbits[index]];
+            delete ribbitDays[abandonedRibbits[index]];
+        }
+        wrbt.wrap(abandonedRibbits);
+    }
+
+    /// @dev Withdraws ribbits by owner in exchange of a wRBT
+    function withdrawRibbits(uint256[] memory _ribbitIds) public {
+        uint256 amount = _ribbitIds.length;
+        for (uint256 index = 0; index < amount; index++) {
+            uint256 _ribbitId = _ribbitIds[index];
+            require(
+                ribbits.ownerOf(_ribbitId) == address(this),
+                "Ribbit not in contract"
+            );
+            require(ribbitOwners[_ribbitId] == msg.sender, "Not ribbit owner");
+            delete ribbitOwners[_ribbitId];
+            delete depositDates[_ribbitId];
+            delete ribbitDays[_ribbitId];
+            ribbits.safeTransferFrom(address(this), msg.sender, _ribbitId);
+        }
+
+        wrbt.transferFrom(msg.sender, address(this), amount);
+    }
+
+    /// @dev Returns an array with all the abandoned ribbits.
+    function getAbandonedRibbits()
+        public
+        view
+        returns (uint256[] memory abandonedRibbits)
+    {
+        uint256 ribbitId;
+        for (uint256 index = 0; index < ribbitCount; index++) {
+            ribbitId = ribbitIndex[index];
+            if (isAbandoned(ribbitId)) {
+                abandonedRibbits[index] = ribbitId;
+            }
+        }
+        return abandonedRibbits;
+    }
+
+    /// @dev Calculates whether a deposited ribbit is out of time.
+    function isAbandoned(uint256 _ribbitId) public view returns (bool) {
+        return
+            depositDates[_ribbitId] + ribbitDays[_ribbitId] < block.timestamp &&
+            ribbits.ownerOf(_ribbitId) == address(this);
     }
 
     /// @dev Adds day credits to the ribbit specified, must be already deposited
@@ -119,7 +179,7 @@ contract RibbitDaycare {
     }
 
     /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number
-    function wrbtAvailable() public view returns (uint256 wrbtBalances) {
+    function wrbtAvailable() public view returns (uint256) {
         return wrbt.balanceOf(address(this)) / (1 * 10**18);
     }
 }
