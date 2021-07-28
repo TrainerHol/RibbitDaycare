@@ -15,12 +15,14 @@ contract RibbitDaycare {
     Ribbits ribbits;
     wRBT wrbt;
     uint256 public ribbitCount;
-    uint256 public wRBTCount;
+    uint256 public stakesCount;
     // Price in SURF per day
     uint256 public daycareFee;
 
     // Index => RibbitID
     mapping(uint256 => uint256) public ribbitIndex;
+    // Index => Staker
+    mapping(uint256 => address) public stakerIndex;
     // RibbitID => Owner
     mapping(uint256 => address) public ribbitOwners;
     // wRBT Staker => Amount
@@ -29,6 +31,8 @@ contract RibbitDaycare {
     mapping(uint256 => uint256) public ribbitDays;
     // RibbitID => Depositted Timestamp
     mapping(uint256 => uint256) public depositDates;
+    // address => SURF Balance
+    mapping(address => uint256) public surfBalances;
 
     constructor(
         address _surf,
@@ -63,9 +67,9 @@ contract RibbitDaycare {
     /// @param amount The amount of wRBT staked, whole number.
     /// Sticking to whole numbers for simplicity, as staking 0.5 wRBT
     /// that is currently not in contract is impossible to withdraw
-    /// for 0.5 Ribbits!
+    /// for half a Ribbit!
     function stakewRBT(uint256 amount) public {
-        require(amount % (1 * 10**18) == 0, "Must be whole wRBT");
+        require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
         require(
             amount <= wrbt.allowance(msg.sender, address(this)),
             "No allowance"
@@ -74,24 +78,46 @@ contract RibbitDaycare {
         wrbt.transferFrom(msg.sender, address(this), amount);
     }
 
-    /// @dev Unstakes wRBT's in the contract if there is supply held.
+    /// @dev Unstakes wRBT's in the contract if there is supply held and wraps abandoned ribbits if any.
     function unstakewRBT(uint256 amount) public {
-        //TODO: Unstake wRBT only if the contract holds abandonded ribbits (and wrap them) or wRBT
+        require(
+            amount > 0 && stakerBalances[msg.sender] >= amount,
+            "Not enough staked"
+        );
+        uint256 abandoned = getAbandonedRibbits().length;
+        require(
+            wrbtAvailable() + abandoned >= amount,
+            "Not enough wRBT in contract"
+        );
+        require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
+        if (abandoned > 0) {
+            wrapAbandonedRibbits();
+        }
+        require(wrbtAvailable() >= amount);
+        stakerBalances[msg.sender] -= amount;
+        wrbt.transfer(msg.sender, amount);
     }
 
-    /// @dev Deposits a ribbit in exchange of a wRBT that is currently staked.
+    /// @dev Deposits a ribbit in exchange of a wRBT that is currently staked in the contract.
     /// @param _ribbitIds Array with the id's of the ribbits.
     /// @param _days Amount of days to deposit for, paid in SURF with bulk discount.
     function daycareDeposit(uint256[] memory _ribbitIds, uint256 _days) public {
+        require(_days > 0, "Days can't be zero");
         uint256 ribbitNumber = _ribbitIds.length;
+        uint256 abandonedRibbits = getAbandonedRibbits().length;
+        uint256 surfAmount = _days * daycareFee;
         require(
-            wrbtAvailable() >= ribbitNumber,
+            wrbtAvailable() + abandonedRibbits >= ribbitNumber,
             "Insufficient wRBT staked in contract"
         );
         require(
-            _days <= surf.allowance(msg.sender, address(this)),
+            surfAmount <= surf.allowance(msg.sender, address(this)),
             "Not enough SURF allowance"
         );
+        // Wrap abandoned ribbits for liquidity, if any
+        if (abandonedRibbits > 0) {
+            wrapAbandonedRibbits();
+        }
         // Add time and deposit date to each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
             ribbitDays[_ribbitIds[index]] = _days * 1 days;
@@ -105,7 +131,9 @@ contract RibbitDaycare {
                 _ribbitIds[index]
             );
         }
-        surf.transferFrom(msg.sender, address(this), _days * daycareFee);
+
+        distributeSURF(surfAmount);
+        surf.transferFrom(msg.sender, address(this), surfAmount);
         wrbt.transfer(msg.sender, ribbitNumber);
     }
 
@@ -165,6 +193,8 @@ contract RibbitDaycare {
     }
 
     /// @dev Adds day credits to the ribbit specified, must be already deposited
+    /// @param _ribbitId The ID of the ribbit.
+    /// @param amount The number of days to add to the ribbit.
     function addDays(uint256 _ribbitId, uint256 amount) public {
         require(
             ribbits.ownerOf(_ribbitId) == address(this),
@@ -175,11 +205,45 @@ contract RibbitDaycare {
             "Not enough SURF allowance"
         );
         ribbitDays[_ribbitId] += amount * 1 days;
-        surf.transferFrom(msg.sender, address(this), amount);
+        uint256 surfAmount = amount * daycareFee;
+        distributeSURF(surfAmount);
+        surf.transferFrom(msg.sender, address(this), surfAmount);
+    }
+
+    /// @dev Distributes SURF to staker balances
+    /// @param amount The amount of SURF to be distributed
+    function distributeSURF(uint256 amount) internal {
+        require(amount > 0);
+        uint256 dividend = amount / getTotalStakes();
+        for (uint256 index = 0; index < stakesCount; index++) {
+            address recipient = stakerIndex[index];
+            uint256 dividends = dividend * stakerBalances[recipient];
+            surfBalances[recipient] += dividends;
+        }
+    }
+
+    /// @dev Withdraws the SURF rewards of the sender
+    function withdrawSURF() public {
+        uint256 surfBalance = surf.balanceOf(address(this));
+        require(
+            surfBalance > 0 && surfBalances[msg.sender] > 0,
+            "No SURF to withdraw"
+        );
+        uint256 amount = surfBalances[msg.sender];
+        surfBalances[msg.sender] = 0;
+        surf.transfer(msg.sender, amount);
     }
 
     /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number
     function wrbtAvailable() public view returns (uint256) {
         return wrbt.balanceOf(address(this)) / (1 * 10**18);
+    }
+
+    /// @dev Returns the total number of current stakes
+    function getTotalStakes() public view returns (uint256 count) {
+        for (uint256 index = 0; index < stakesCount; index++) {
+            count += stakerBalances[stakerIndex[index]];
+        }
+        return count;
     }
 }
