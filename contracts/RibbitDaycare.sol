@@ -75,6 +75,7 @@ contract RibbitDaycare {
             "No allowance"
         );
         stakerBalances[msg.sender] += amount;
+        stakesCount++;
         wrbt.transferFrom(msg.sender, address(this), amount);
     }
 
@@ -240,7 +241,7 @@ contract RibbitDaycare {
     }
 
     /// @dev Returns the total number of current stakes
-    function getTotalStakes() public view returns (uint256 count) {
+    function getTotalStakes() internal view returns (uint256 count) {
         for (uint256 index = 0; index < stakesCount; index++) {
             count += stakerBalances[stakerIndex[index]];
         }
