@@ -15,14 +15,15 @@ contract RibbitDaycare {
     Ribbits ribbits;
     wRBT wrbt;
     uint256 public ribbitCount;
-    uint256 public stakesCount;
     // Price in SURF per day
     uint256 public daycareFee;
+    // Hard limit to number of stakers
+    uint256 public constant maxStakingSlots = 500;
 
     // Index => RibbitID
     mapping(uint256 => uint256) public ribbitIndex;
     // Index => Staker
-    mapping(uint256 => address) public stakerIndex;
+    address[] public stakerIndex;
     // RibbitID => Owner
     mapping(uint256 => address) public ribbitOwners;
     // wRBT Staker => Amount
@@ -69,13 +70,16 @@ contract RibbitDaycare {
     /// that is currently not in contract is impossible to withdraw
     /// for half a Ribbit!
     function stakewRBT(uint256 amount) public {
+        require(stakerIndex.length < maxStakingSlots, "No slots");
         require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
         require(
             amount <= wrbt.allowance(msg.sender, address(this)),
             "No allowance"
         );
         stakerBalances[msg.sender] += amount;
-        stakesCount++;
+        if (!hasStakeIndex(msg.sender)) {
+            stakerIndex.push(msg.sender);
+        }
         wrbt.transferFrom(msg.sender, address(this), amount);
     }
 
@@ -96,6 +100,22 @@ contract RibbitDaycare {
         }
         require(wrbtAvailable() >= amount);
         stakerBalances[msg.sender] -= amount;
+        // Remove staker from the index
+        if (stakerBalances[msg.sender] == 0) {
+            for (uint256 index = 0; index < stakerIndex.length; index++) {
+                if (stakerIndex[index] == msg.sender) {
+                    // Swap the index with the last element and then pop()
+                    if (index < stakerIndex.length) {
+                        stakerIndex[index] = stakerIndex[
+                            stakerIndex.length - 1
+                        ];
+                    }
+                    stakerIndex.pop();
+                    stakerIndex[index] = stakerIndex[stakerIndex.length - 1];
+                    break;
+                }
+            }
+        }
         wrbt.transfer(msg.sender, amount);
     }
 
@@ -216,7 +236,7 @@ contract RibbitDaycare {
     function distributeSURF(uint256 amount) internal {
         require(amount > 0);
         uint256 dividend = amount / getTotalStakes();
-        for (uint256 index = 0; index < stakesCount; index++) {
+        for (uint256 index = 0; index < stakerIndex.length; index++) {
             address recipient = stakerIndex[index];
             uint256 dividends = dividend * stakerBalances[recipient];
             surfBalances[recipient] += dividends;
@@ -242,9 +262,17 @@ contract RibbitDaycare {
 
     /// @dev Returns the total number of current stakes
     function getTotalStakes() internal view returns (uint256 count) {
-        for (uint256 index = 0; index < stakesCount; index++) {
+        for (uint256 index = 0; index < stakerIndex.length; index++) {
             count += stakerBalances[stakerIndex[index]];
         }
         return count;
+    }
+
+    /// @dev Checks whether the address is in the index
+    function hasStakeIndex(address staker) internal view returns (bool) {
+        for (uint256 index = 0; index < stakerIndex.length; index++) {
+            if (stakerIndex[index] == staker) return true;
+        }
+        return false;
     }
 }
