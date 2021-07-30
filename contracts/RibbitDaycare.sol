@@ -10,7 +10,7 @@ pragma solidity ^0.8.4;
 
 import "./Interfaces.sol";
 
-contract RibbitDaycare {
+contract RibbitDaycare is IERC721Receiver {
     SURF surf;
     Ribbits ribbits;
     wRBT wrbt;
@@ -274,5 +274,15 @@ contract RibbitDaycare {
             if (stakerIndex[index] == staker) return true;
         }
         return false;
+    }
+
+    /// @dev Needed to deposit ribbits?
+    function onERC721Received(
+        address,
+        address,
+        uint256,
+        bytes memory
+    ) public virtual override returns (bytes4) {
+        return this.onERC721Received.selector;
     }
 }
