@@ -14,14 +14,13 @@ contract RibbitDaycare is IERC721Receiver {
     SURF surf;
     Ribbits ribbits;
     wRBT wrbt;
-    uint256 public ribbitCount;
     // Price in SURF per day
     uint256 public daycareFee;
     // Hard limit to number of stakers
     uint256 public constant maxStakingSlots = 500;
 
     // Index => RibbitID
-    mapping(uint256 => uint256) public ribbitIndex;
+    uint256[] public ribbitIndex;
     // Index => Staker
     address[] public stakerIndex;
     // RibbitID => Owner
@@ -55,7 +54,7 @@ contract RibbitDaycare is IERC721Receiver {
         returns (uint256[] memory ribbitList)
     {
         uint256 counter = 0;
-        for (uint256 index = 0; index < ribbitCount; index++) {
+        for (uint256 index = 0; index < ribbitIndex.length; index++) {
             if (ribbitOwners[ribbitIndex[index]] == owner) {
                 ribbitList[counter] = (ribbitIndex[index]);
                 counter++;
@@ -105,13 +104,12 @@ contract RibbitDaycare is IERC721Receiver {
             for (uint256 index = 0; index < stakerIndex.length; index++) {
                 if (stakerIndex[index] == msg.sender) {
                     // Swap the index with the last element and then pop()
-                    if (index < stakerIndex.length) {
+                    if (index < stakerIndex.length && stakerIndex.length > 1) {
                         stakerIndex[index] = stakerIndex[
                             stakerIndex.length - 1
                         ];
                     }
                     stakerIndex.pop();
-                    stakerIndex[index] = stakerIndex[stakerIndex.length - 1];
                     break;
                 }
             }
@@ -143,6 +141,7 @@ contract RibbitDaycare is IERC721Receiver {
         for (uint256 index = 0; index < ribbitNumber; index++) {
             ribbitDays[_ribbitIds[index]] = _days * 1 days;
             depositDates[_ribbitIds[index]] = block.timestamp;
+            ribbitOwners[_ribbitIds[index]] = msg.sender;
         }
         // Transfer each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
@@ -197,7 +196,7 @@ contract RibbitDaycare is IERC721Receiver {
         returns (uint256[] memory abandonedRibbits)
     {
         uint256 ribbitId;
-        for (uint256 index = 0; index < ribbitCount; index++) {
+        for (uint256 index = 0; index < ribbitIndex.length; index++) {
             ribbitId = ribbitIndex[index];
             if (isAbandoned(ribbitId)) {
                 abandonedRibbits[index] = ribbitId;
@@ -283,6 +282,9 @@ contract RibbitDaycare is IERC721Receiver {
         uint256,
         bytes memory
     ) public virtual override returns (bytes4) {
+        if (this.onERC721Received.selector != 0x150b7a02) {
+            return 0x150b7a02;
+        }
         return this.onERC721Received.selector;
     }
 }
