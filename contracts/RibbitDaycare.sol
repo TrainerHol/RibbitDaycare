@@ -128,7 +128,7 @@ contract RibbitDaycare is IERC721Receiver {
         uint256 abandonedRibbits = getAbandonedRibbits().length;
         uint256 surfAmount = _days * daycareFee;
         require(
-            wrbtAvailable() + abandonedRibbits >= ribbitNumber,
+            wrbtAvailable() / (1 * 10**18) + abandonedRibbits >= ribbitNumber,
             "Insufficient wRBT staked in contract"
         );
         require(
@@ -257,7 +257,7 @@ contract RibbitDaycare is IERC721Receiver {
 
     /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number
     function wrbtAvailable() public view returns (uint256) {
-        return wrbt.balanceOf(address(this)) / (1 * 10**18);
+        return wrbt.balanceOf(address(this));
     }
 
     /// @dev Returns the total number of current stakes
