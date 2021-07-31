@@ -234,6 +234,7 @@ contract RibbitDaycare is IERC721Receiver {
     /// @param amount The amount of SURF to be distributed
     function distributeSURF(uint256 amount) internal {
         require(amount > 0);
+        amount = amount - (amount * surf.transferFee()) / 1000;
         uint256 dividend = amount / getTotalStakes();
         for (uint256 index = 0; index < stakerIndex.length; index++) {
             address recipient = stakerIndex[index];

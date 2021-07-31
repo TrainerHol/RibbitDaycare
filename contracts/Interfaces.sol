@@ -27,6 +27,8 @@ interface SURF {
         address recipient,
         uint256 amount
     ) external returns (bool);
+
+    function transferFee() external returns (uint256);
 }
 
 interface Ribbits {
