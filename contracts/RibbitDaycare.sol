@@ -154,7 +154,7 @@ contract RibbitDaycare is IERC721Receiver {
 
         distributeSURF(surfAmount);
         surf.transferFrom(msg.sender, address(this), surfAmount);
-        wrbt.transfer(msg.sender, ribbitNumber);
+        wrbt.transfer(msg.sender, ribbitNumber * 10**18);
     }
 
     /// @dev Wraps all ribbits owned by the contract that have no time left.
@@ -186,7 +186,7 @@ contract RibbitDaycare is IERC721Receiver {
             ribbits.safeTransferFrom(address(this), msg.sender, _ribbitId);
         }
 
-        wrbt.transferFrom(msg.sender, address(this), amount);
+        wrbt.transferFrom(msg.sender, address(this), amount * 10**18);
     }
 
     /// @dev Returns an array with all the abandoned ribbits.
@@ -235,7 +235,7 @@ contract RibbitDaycare is IERC721Receiver {
     function distributeSURF(uint256 amount) internal {
         require(amount > 0);
         amount = amount - (amount * surf.transferFee()) / 1000;
-        uint256 dividend = amount / getTotalStakes();
+        uint256 dividend = (amount / getTotalStakes()) * 10**18;
         for (uint256 index = 0; index < stakerIndex.length; index++) {
             address recipient = stakerIndex[index];
             uint256 dividends = dividend * stakerBalances[recipient];
@@ -261,7 +261,7 @@ contract RibbitDaycare is IERC721Receiver {
     }
 
     /// @dev Returns the total number of current stakes
-    function getTotalStakes() internal view returns (uint256 count) {
+    function getTotalStakes() public view returns (uint256 count) {
         for (uint256 index = 0; index < stakerIndex.length; index++) {
             count += stakerBalances[stakerIndex[index]];
         }
