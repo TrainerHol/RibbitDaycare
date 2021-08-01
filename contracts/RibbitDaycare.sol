@@ -49,14 +49,21 @@ contract RibbitDaycare is IERC721Receiver {
 
     /// @dev Gets the ID's of ribbits currently deposited by someone
     function GetDepositedRibbits(address owner)
-        public
+        external
         view
         returns (uint256[] memory ribbitList)
     {
         uint256 counter = 0;
         for (uint256 index = 0; index < ribbitIndex.length; index++) {
             if (ribbitOwners[ribbitIndex[index]] == owner) {
-                ribbitList[counter] = (ribbitIndex[index]);
+                counter++;
+            }
+        }
+        ribbitList = new uint256[](counter);
+        counter = 0;
+        for (uint256 index = 0; index < ribbitIndex.length; index++) {
+            if (ribbitOwners[ribbitIndex[index]] == owner) {
+                ribbitList[counter] = ribbitIndex[index];
                 counter++;
             }
         }
@@ -139,9 +146,13 @@ contract RibbitDaycare is IERC721Receiver {
         }
         // Add time and deposit date to each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
-            ribbitDays[_ribbitIds[index]] = _days * 1 days;
-            depositDates[_ribbitIds[index]] = block.timestamp;
-            ribbitOwners[_ribbitIds[index]] = msg.sender;
+            uint256 ribId = _ribbitIds[index];
+            ribbitDays[ribId] = _days * 1 days;
+            depositDates[ribId] = block.timestamp;
+            ribbitOwners[ribId] = msg.sender;
+            if (!hasRibbitIndex(ribId)) {
+                ribbitIndex.push(ribId);
+            }
         }
         // Transfer each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
@@ -196,10 +207,19 @@ contract RibbitDaycare is IERC721Receiver {
         returns (uint256[] memory abandonedRibbits)
     {
         uint256 ribbitId;
+        uint256 count;
         for (uint256 index = 0; index < ribbitIndex.length; index++) {
             ribbitId = ribbitIndex[index];
             if (isAbandoned(ribbitId)) {
-                abandonedRibbits[index] = ribbitId;
+                count++;
+            }
+        }
+        abandonedRibbits = new uint256[](count);
+        count = 0;
+        for (uint256 index = 0; index < ribbitIndex.length; index++) {
+            ribbitId = ribbitIndex[index];
+            if (isAbandoned(ribbitId)) {
+                abandonedRibbits[count] = ribbitId;
             }
         }
         return abandonedRibbits;
@@ -273,6 +293,14 @@ contract RibbitDaycare is IERC721Receiver {
     function hasStakeIndex(address staker) internal view returns (bool) {
         for (uint256 index = 0; index < stakerIndex.length; index++) {
             if (stakerIndex[index] == staker) return true;
+        }
+        return false;
+    }
+
+    /// @dev Checks whether the ribbit is in the index
+    function hasRibbitIndex(uint256 _ribbitId) internal view returns (bool) {
+        for (uint256 index = 0; index < ribbitIndex.length; index++) {
+            if (ribbitIndex[index] == _ribbitId) return true;
         }
         return false;
     }
