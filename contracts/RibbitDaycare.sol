@@ -89,21 +89,14 @@ contract RibbitDaycare is IERC721Receiver {
         wrbt.transferFrom(msg.sender, address(this), amount);
     }
 
-    /// @dev Unstakes wRBT's in the contract if there is supply held and wraps abandoned ribbits if any.
+    /// @dev Unstakes wRBT's in the contract if there is supply held.
     function unstakewRBT(uint256 amount) public {
         require(
             amount > 0 && stakerBalances[msg.sender] >= amount,
             "Not enough staked"
         );
-        uint256 abandoned = getAbandonedRibbits().length;
-        require(
-            wrbtAvailable() + abandoned >= amount,
-            "Not enough wRBT in contract"
-        );
+        require(wrbtAvailable() >= amount, "Not enough wRBT in contract");
         require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
-        if (abandoned > 0) {
-            wrapAbandonedRibbits();
-        }
         require(wrbtAvailable() >= amount);
         stakerBalances[msg.sender] -= amount;
         // Remove staker from the index
@@ -130,20 +123,11 @@ contract RibbitDaycare is IERC721Receiver {
     function daycareDeposit(uint256[] memory _ribbitIds, uint256 _days) public {
         require(_days > 0, "Days can't be zero");
         uint256 ribbitNumber = _ribbitIds.length;
-        uint256 abandonedRibbits = getAbandonedRibbits().length;
         uint256 surfAmount = _days * daycareFee;
         require(
-            wrbtAvailable() / (1 * 10**18) + abandonedRibbits >= ribbitNumber,
+            wrbtAvailable() / (1 * 10**18) >= ribbitNumber,
             "Insufficient wRBT staked in contract"
         );
-        require(
-            surfAmount <= surf.allowance(msg.sender, address(this)),
-            "Not enough SURF allowance"
-        );
-        // Wrap abandoned ribbits for liquidity, if any
-        if (abandonedRibbits > 0) {
-            wrapAbandonedRibbits();
-        }
         // Add time and deposit date to each ribbit
         for (uint256 index = 0; index < ribbitNumber; index++) {
             uint256 ribId = _ribbitIds[index];
@@ -239,10 +223,6 @@ contract RibbitDaycare is IERC721Receiver {
         require(
             ribbits.ownerOf(_ribbitId) == address(this),
             "Ribbit not in daycare"
-        );
-        require(
-            amount <= surf.allowance(msg.sender, address(this)),
-            "Not enough SURF allowance"
         );
         ribbitDays[_ribbitId] += amount * 1 days;
         uint256 surfAmount = amount * daycareFee;
