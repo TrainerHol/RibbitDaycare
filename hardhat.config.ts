@@ -1,6 +1,7 @@
 import {task} from "hardhat/config";
-import ("@nomiclabs/hardhat-waffle");
-import {ethers} from "ethers";
+import '@typechain/hardhat'
+import '@nomiclabs/hardhat-ethers'
+import '@nomiclabs/hardhat-waffle'
 require('dotenv').config();
 
 
