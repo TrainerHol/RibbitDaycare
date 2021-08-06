@@ -9,6 +9,7 @@
 
 pragma solidity ^0.8.4;
 
+/// @dev The interface for the SURF ERC-20 Contract.
 interface SURF {
     function balanceOf(address) external view returns (uint256);
 
@@ -31,6 +32,7 @@ interface SURF {
     function transferFee() external returns (uint256);
 }
 
+/// @dev The interface for the Ribbits contract (ribbits.xyz)
 interface Ribbits {
     function approve(address _approved, uint256 _tokenId) external;
 
@@ -45,6 +47,7 @@ interface Ribbits {
     function setApprovalForAll(address _operator, bool _approved) external;
 }
 
+/// @dev The interface for the wrapped ribbits contract
 interface wRBT {
     function approve(address _spender, uint256 _tokens) external returns (bool);
 
@@ -66,6 +69,7 @@ interface wRBT {
     function wrap(uint256[] calldata _tokenIds) external;
 }
 
+/// @dev The ERC721 Receiver interface
 interface IERC721Receiver {
     function onERC721Received(
         address operator,

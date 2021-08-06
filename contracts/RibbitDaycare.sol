@@ -6,6 +6,10 @@
 //   \:: ___::\ \   \:\ \ \ \    \:\ \____
 //    \: \ \\::\ \   \:\_\ \ \    \:\/___/\
 //     \__\/ \::\/    \_____\/     \_____\/
+/// @title Ribbit Daycare
+/// @author Hol
+/// @notice A wrapper for Ribbits with ownership.
+
 pragma solidity ^0.8.4;
 
 import "./Interfaces.sol";
@@ -47,7 +51,9 @@ contract RibbitDaycare is IERC721Receiver {
         ribbits.setApprovalForAll(_wrbt, true);
     }
 
-    /// @dev Gets the ID's of ribbits currently deposited by someone
+    /// @dev Gets the ID's of ribbits currently deposited by someone.
+    /// @param owner The address of the owner.
+    /// @return ribbitList List of ribbits owned by the address.
     function GetDepositedRibbits(address owner)
         external
         view
@@ -165,7 +171,8 @@ contract RibbitDaycare is IERC721Receiver {
         wrbt.wrap(abandonedRibbits);
     }
 
-    /// @dev Withdraws ribbits by owner in exchange of a wRBT
+    /// @dev Withdraws ribbits by their owner in exchange of a wRBT
+    /// @param _ribbitIds Array with the ids of all the Ribbits
     function withdrawRibbits(uint256[] memory _ribbitIds) public {
         uint256 amount = _ribbitIds.length;
         for (uint256 index = 0; index < amount; index++) {
@@ -210,6 +217,7 @@ contract RibbitDaycare is IERC721Receiver {
     }
 
     /// @dev Calculates whether a deposited ribbit is out of time.
+    /// @param _ribbitId The id of the ribbit.
     function isAbandoned(uint256 _ribbitId) public view returns (bool) {
         return
             depositDates[_ribbitId] + ribbitDays[_ribbitId] < block.timestamp &&
