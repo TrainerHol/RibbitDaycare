@@ -1,4 +1,4 @@
-# Ribbit Daycare
+# 🐸 Ribbit Daycare 🐸
 
 Ribbit Daycare is a wrapping system designed for keeping your rare [ribbits](https://ribbits.xyz) safe by allowing you to deposit your ribbit in the contract for a set amount of time.
 
