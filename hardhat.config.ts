@@ -33,11 +33,12 @@ const config: HardhatUserConfig = {
       gasPrice: 30,
       chainId: 1337,
     },
-    kovan: {
-      url: process.env.TESTNET_RPC_URL,
-      accounts: [process.env.PRIVATE_KEY+""],
-    }
+    // kovan: {
+    //   url: process.env.TESTNET_RPC_URL,
+    //   accounts: [process.env.PRIVATE_KEY+""],
+    // }
   },
   
 };
+export default config;
 
