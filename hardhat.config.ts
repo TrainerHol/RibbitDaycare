@@ -2,6 +2,10 @@ import {HardhatUserConfig, task} from "hardhat/config";
 import '@typechain/hardhat'
 import '@nomiclabs/hardhat-ethers'
 import '@nomiclabs/hardhat-waffle'
+import "hardhat-deploy-ethers";
+import "hardhat-deploy";
+import "@symfoni/hardhat-react";
+import "@typechain/ethers-v5";
 require('dotenv').config();
 
 

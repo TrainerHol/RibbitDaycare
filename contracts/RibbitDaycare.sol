@@ -22,6 +22,13 @@ contract RibbitDaycare is IERC721Receiver {
     uint256 public daycareFee;
     // Hard limit to number of stakers
     uint256 public constant maxStakingSlots = 500;
+    // Current Stakes
+    uint256 public currentStakes;
+    uint256 public surfRewards;
+    // wRBT Staker => Amount
+    mapping(address => uint256) public stakerBalances;
+    // Snapshots to calculate the reward
+    mapping(address => uint256) rewardSnapshots;
 
     // Index => RibbitID
     uint256[] public ribbitIndex;
@@ -29,8 +36,7 @@ contract RibbitDaycare is IERC721Receiver {
     address[] public stakerIndex;
     // RibbitID => Owner
     mapping(uint256 => address) public ribbitOwners;
-    // wRBT Staker => Amount
-    mapping(address => uint256) public stakerBalances;
+
     // RibbitID => Number of Days
     mapping(uint256 => uint256) public ribbitDays;
     // RibbitID => Depositted Timestamp
@@ -82,16 +88,10 @@ contract RibbitDaycare is IERC721Receiver {
     /// that is currently not in contract is impossible to withdraw
     /// for half a Ribbit!
     function stakewRBT(uint256 amount) public {
-        require(stakerIndex.length < maxStakingSlots, "No slots");
         require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
-        require(
-            amount <= wrbt.allowance(msg.sender, address(this)),
-            "No allowance"
-        );
         stakerBalances[msg.sender] += amount;
-        if (!hasStakeIndex(msg.sender)) {
-            stakerIndex.push(msg.sender);
-        }
+        rewardSnapshots[msg.sender] = surfRewards;
+        currentStakes += amount;
         wrbt.transferFrom(msg.sender, address(this), amount);
     }
 
@@ -103,24 +103,21 @@ contract RibbitDaycare is IERC721Receiver {
         );
         require(wrbtAvailable() >= amount, "Not enough wRBT in contract");
         require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
-        require(wrbtAvailable() >= amount);
+        withdrawSURF();
         stakerBalances[msg.sender] -= amount;
-        // Remove staker from the index
-        if (stakerBalances[msg.sender] == 0) {
-            for (uint256 index = 0; index < stakerIndex.length; index++) {
-                if (stakerIndex[index] == msg.sender) {
-                    // Swap the index with the last element and then pop()
-                    if (index < stakerIndex.length && stakerIndex.length > 1) {
-                        stakerIndex[index] = stakerIndex[
-                            stakerIndex.length - 1
-                        ];
-                    }
-                    stakerIndex.pop();
-                    break;
-                }
-            }
-        }
+        currentStakes -= amount;
         wrbt.transfer(msg.sender, amount);
+    }
+
+    /// @dev Withdraws the SURF rewards of the sender and changes snapshot
+    function withdrawSURF() public {
+        uint256 surfBalance = surf.balanceOf(address(this));
+        uint256 unclaimedSurf = stakerBalances[msg.sender] *
+            (surfRewards - rewardSnapshots[msg.sender]);
+        if (surfBalance > 0 && unclaimedSurf > 0) {
+            rewardSnapshots[msg.sender] = surfRewards;
+            surf.transfer(msg.sender, unclaimedSurf);
+        }
     }
 
     /// @dev Deposits a ribbit in exchange of a wRBT that is currently staked in the contract.
@@ -238,51 +235,17 @@ contract RibbitDaycare is IERC721Receiver {
         surf.transferFrom(msg.sender, address(this), surfAmount);
     }
 
-    /// @dev Distributes SURF to staker balances
+    /// @dev Adds the calculated surf reward dividend for the current snapshot
     /// @param amount The amount of SURF to be distributed
     function distributeSURF(uint256 amount) internal {
-        require(amount > 0);
+        require(amount > 0 && currentStakes > 0);
         amount = amount - (amount * surf.transferFee()) / 1000;
-        uint256 dividend = amount / (getTotalStakes() / (1 * 10**18));
-        for (uint256 index = 0; index < stakerIndex.length; index++) {
-            address recipient = stakerIndex[index];
-            uint256 dividends = dividend *
-                (stakerBalances[recipient] / (1 * 10**18));
-            surfBalances[recipient] += dividends;
-        }
-    }
-
-    /// @dev Withdraws the SURF rewards of the sender
-    function withdrawSURF() public {
-        uint256 surfBalance = surf.balanceOf(address(this));
-        require(
-            surfBalance > 0 && surfBalances[msg.sender] > 0,
-            "No SURF to withdraw"
-        );
-        uint256 amount = surfBalances[msg.sender];
-        surfBalances[msg.sender] = 0;
-        surf.transfer(msg.sender, amount);
+        surfRewards += amount / currentStakes;
     }
 
     /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number
     function wrbtAvailable() public view returns (uint256) {
         return wrbt.balanceOf(address(this));
-    }
-
-    /// @dev Returns the total number of current stakes
-    function getTotalStakes() public view returns (uint256 count) {
-        for (uint256 index = 0; index < stakerIndex.length; index++) {
-            count += stakerBalances[stakerIndex[index]];
-        }
-        return count;
-    }
-
-    /// @dev Checks whether the address is in the index
-    function hasStakeIndex(address staker) internal view returns (bool) {
-        for (uint256 index = 0; index < stakerIndex.length; index++) {
-            if (stakerIndex[index] == staker) return true;
-        }
-        return false;
     }
 
     /// @dev Checks whether the ribbit is in the index
