@@ -1,8 +1,8 @@
-import {ethers} from "hardhat";
+import { ethers } from "ethers";
 
+const hre = require("hardhat");
 async function main() {
-  const accounts = ethers.getSigners();
-  const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545/');
+  const provider = new ethers.providers.JsonRpcProvider("http://localhost:8545");
   // Increase the time by one year
   console.log("Starting time: " + provider.blockNumber);
   await provider.send("evm_increaseTime", [31536000]);
@@ -14,7 +14,7 @@ async function main() {
 // and properly handle errors.
 main()
   .then(() => process.exit(0))
-  .catch(error => {
+  .catch((error) => {
     console.error(error);
     process.exit(1);
   });

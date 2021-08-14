@@ -25,6 +25,7 @@ contract RibbitDaycare is IERC721Receiver {
     // Current Stakes
     uint256 public currentStakes;
     uint256 public surfRewards;
+    uint256 surfDivChange;
     // wRBT Staker => Amount
     mapping(address => uint256) public stakerBalances;
     // Snapshots to calculate the reward
@@ -90,6 +91,7 @@ contract RibbitDaycare is IERC721Receiver {
     function stakewRBT(uint256 amount) public {
         require(amount % (1 * 10**18) == 0 && amount > 0, "Must be whole wRBT");
         stakerBalances[msg.sender] += amount;
+        withdrawSURF();
         rewardSnapshots[msg.sender] = surfRewards;
         currentStakes += amount;
         wrbt.transferFrom(msg.sender, address(this), amount);
@@ -208,6 +210,7 @@ contract RibbitDaycare is IERC721Receiver {
             ribbitId = ribbitIndex[index];
             if (isAbandoned(ribbitId)) {
                 abandonedRibbits[count] = ribbitId;
+                count++;
             }
         }
         return abandonedRibbits;
@@ -239,8 +242,9 @@ contract RibbitDaycare is IERC721Receiver {
     /// @param amount The amount of SURF to be distributed
     function distributeSURF(uint256 amount) internal {
         require(amount > 0 && currentStakes > 0);
-        amount = amount - (amount * surf.transferFee()) / 1000;
+        amount = amount + surfDivChange - (amount * surf.transferFee()) / 1000;
         surfRewards += amount / currentStakes;
+        surfDivChange = amount % currentStakes;
     }
 
     /// @dev Returns the balance of wRBT held by the contract, rounded to a whole number

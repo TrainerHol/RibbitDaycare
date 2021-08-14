@@ -170,7 +170,9 @@ export const Symfoni: React.FC<SymfoniProps> = ({
     }, [initializeCounter])
 
     const getRibbitDaycare = (_provider: providers.Provider, _signer?: Signer) => {
-        let instance = _signer ? RibbitDaycare__factory.connect(ethers.constants.AddressZero, _signer) : RibbitDaycare__factory.connect(ethers.constants.AddressZero, _provider)
+
+        const contractAddress = "0xCD8a1C3ba11CF5ECfa6267617243239504a98d90"
+        const instance = _signer ? RibbitDaycare__factory.connect(contractAddress, _signer) : RibbitDaycare__factory.connect(contractAddress, _provider)
         const contract: SymfoniRibbitDaycare = {
             instance: instance,
             factory: _signer ? new RibbitDaycare__factory(_signer) : undefined,
